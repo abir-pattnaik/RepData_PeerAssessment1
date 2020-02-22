@@ -1,25 +1,258 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Abir Pattnaik"
+date: "18/02/2020"
+output: html_document
 ---
+# Analysis for the activities done over a 2 month period
 
+Below data is collected from activity monitoring device that has captured the activities over 5 minute intervals for 2 months.Initial data that has been given to us:
+
+  1. steps: No. of steps taken in 5 minute interval.
+  2. date: Date of measurement (format : YYYY-MM-DD)
+  3. interval : identifier for 5 minute interval
+  
+## Adding required libraries
+
+I am using the below libraries.If they are not present in your local environment.Please install them(uncomment install packages).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages(c('ggplot2','dplyr','lattice'))
+
+library(ggplot2)
+library(dplyr)
+library(lattice)
+
+
+```
 
 ## Loading and preprocessing the data
 
+### Load the data (read.csv()) 
 
+For loading the dataset I am first setting the working directory from where I am going to unzip the folder for dataset
+
+### Process/transform the data (if necessary) into a format suitable for your analysis
+
+For transforming, I am converting date to PosixCt format.
+
+```{r read_data, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/abirp/OneDrive/Desktop/Coursera_Projects/Course_5_reproducible_research")
+unzip('activity.zip')
+list.files("./")
+activity_data<-read.csv('./activity.csv')
+activity_data$date<-as.POSIXct(activity_data$date)
+
+```
 
 ## What is mean total number of steps taken per day?
 
+For taking the total number of steps, I have taken the group by with respect to date and passed on the sum function to calculate the total number of steps.
 
+Please note: NA values are ignored for this dataset.
+
+```{r hist_plot}
+knitr::opts_chunk$set(echo = TRUE)
+steps_sum_per_day<-aggregate(x=activity_data$steps,by=list(activity_data$date),FUN='sum')
+plot(x = steps_sum_per_day$Group.1,y=steps_sum_per_day$x,type = 'h'
+     ,main = 'Sum of steps per day',xlab = 'Date',ylab='Sum of Steps',col='Red')
+```
+
+```{r hist_plot_save, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+png(filename="./figures/1_sum_of_steps_per_day.png", width=480, height=480, units="px")
+plot(x = steps_sum_per_day$Group.1,y=steps_sum_per_day$x,type = 'h'
+     ,main = 'Sum of steps per day',xlab = 'Date',ylab='Sum of Steps',col='Red')
+dev.off()
+```
+
+## Calculate and report the mean and median of the total number of steps taken per day
+
+```{r mean_median}
+knitr::opts_chunk$set(echo = TRUE)
+print('Mean of total number of steps taken')
+mean(steps_sum_per_day$x,na.rm = TRUE)
+print('Median of total number of steps taken')
+median(steps_sum_per_day$x,na.rm=TRUE)
+```
 
 ## What is the average daily activity pattern?
 
+### Make a time series plot (type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
+```{r plot_1_avg_no}
+knitr::opts_chunk$set(echo = TRUE)
+interval_avg_steps<-data.frame(activity_data%>%select(interval,steps)%>%group_by(interval)%>%summarise(mean(steps,na.rm=TRUE)))
+colnames(interval_avg_steps)<-c('interval','avg_steps')
+plot(x=interval_avg_steps$interval,y=interval_avg_steps$avg_steps,type = 'l',main = "Time Series plot across intervals with average no. of steps "
+          ,xlab = 'Interval',ylab='Average steps',col='Purple')
+```
+
+
+```{r plot_1_avg_no_save, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+png(filename="./figures/2_avg_no_interval.png", width=480, height=480, units="px")
+plot(x=interval_avg_steps$interval,y=interval_avg_steps$avg_steps,type = 'l',main = "Time Series plot across intervals with average no. of steps "
+          ,xlab = 'Interval',ylab='Average steps',col='Purple')
+dev.off()
+```
+
+### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r max_steps_interval_based}
+knitr::opts_chunk$set(echo = TRUE)
+print('Max. no. of steps for 5 minute interval-INTERVAL details -> ')
+interval_avg_steps[interval_avg_steps$avg_steps==max(interval_avg_steps$avg_steps),]$interval
+print('Max. no. of steps for 5 minute interval-No. of steps details -> ')
+interval_avg_steps[interval_avg_steps$avg_steps==max(interval_avg_steps$avg_steps),]$avg_steps
+```
 
 ## Imputing missing values
 
+For imputing the missing values, I have taken the median values of all the days for each interval and then filled in the details.I always prefer median over the mean because sometimes the mean gets affected by the outliers which is not such an issue for the median values.And since, I am taking it across 5 minute intervals, I can get a value closer to the details.
 
+### Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NA)
+
+```{r check_missing_values}
+knitr::opts_chunk$set(echo = TRUE)
+sum(is.na(activity_data))
+```
+
+
+### Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+  Steps taken to add new values.
+
+  1.Create a copy of original dataset.
+  2.Group by intervals 
+  3.If they are NA values, replace it with median otherwise remain as it is.
+  
+```{r impute_Data}
+knitr::opts_chunk$set(echo = TRUE)
+
+imputed_activity_data<-activity_data
+imputed_activity_data<-data.frame(imputed_activity_data %>% group_by(interval) %>%
+  mutate(steps=ifelse(is.na(steps),median(steps,na.rm=TRUE),steps)))
+```
+
+
+### Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day.
+
+#### Do these values differ from the estimates from the first part of the assignment?
+#### What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r impute_Data_transform}
+knitr::opts_chunk$set(echo = TRUE)
+imputed_activity_data$date<-as.POSIXct(imputed_activity_data$date)
+```
+
+Since we need to same analysis for our data(with NA values added). I will use the same method as before.
+
+### What is mean total number of steps taken per day? Calculate the total number of steps taken per day
+
+```{r steps_sum_per_day_impute}
+knitr::opts_chunk$set(echo = TRUE)
+steps_sum_per_day_impute<-aggregate(x=imputed_activity_data$steps,by=list(imputed_activity_data$date),FUN='sum')
+```
+
+### Make a histogram of the total number of steps taken each day
+
+```{r hist_plot_impute}
+knitr::opts_chunk$set(echo = TRUE)
+plot(x = steps_sum_per_day_impute$Group.1,y=steps_sum_per_day_impute$x,type = 'h'
+     ,main = 'Sum of steps per day',xlab = 'Date',ylab='Sum of Steps',col='Red')
+```
+
+```{r hist_plot_impute_save, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+png(filename="./figures/3_sum_of_steps_per_day_impute.png", width=480, height=480, units="px")
+plot(x = steps_sum_per_day_impute$Group.1,y=steps_sum_per_day_impute$x,type = 'h'
+     ,main = 'Sum of steps per day',xlab = 'Date',ylab='Sum of Steps',col='Red')
+dev.off()
+```
+
+### Calculate and report the mean and median of the total number of steps taken per day
+
+```{r mean_median_impute}
+knitr::opts_chunk$set(echo = TRUE)
+print('Mean of total number of steps taken after missing values were filled - ')
+mean(steps_sum_per_day_impute$x,na.rm = TRUE)
+print('Median of total number of steps taken after missing values were filled - ')
+median(steps_sum_per_day_impute$x,na.rm=TRUE)
+```
+
+Clearly the values are different from the original values without values filled.
+
+
+### What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+To compare the estimates of the total daily number of steps, I am creating graph between imputed data and non-imputed data.
+
+```{r impute_Data_transform_comparison}
+knitr::opts_chunk$set(echo = TRUE)
+steps_sum_per_day_impute$Group.1<-as.POSIXct(steps_sum_per_day_impute$Group.1)
+steps_sum_per_day$Group.1<-as.POSIXct(steps_sum_per_day$Group.1)
+comparison_data<-merge(steps_sum_per_day,steps_sum_per_day_impute,by='Group.1')
+colnames(comparison_data)<-c('Date','non_imputed_data','imputed_data')
+```
+
+```{r plot_comparison_impute}
+knitr::opts_chunk$set(echo = TRUE)
+plot(x=comparison_data$Date,y=comparison_data$imputed_data,type='l',col='red',main = 'Comparison within NA value and imputed data'
+     ,xlab = 'Date',ylab='No. of steps')
+lines(x=comparison_data$Date,y=comparison_data$non_imputed_data,col='purple')
+legend("topright",legend=c('Imputed_data','Non-Imputed Data'),col=c('red','purple'),lty=1,cex=0.5)
+```
+```{r plot_comparison_impute_save, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+png(filename="./figures/4_comparison.png", width=480, height=480, units="px")
+plot(x=comparison_data$Date,y=comparison_data$imputed_data,type='l',col='red',main = 'Comparison within NA value and imputed data'
+     ,xlab = 'Date',ylab='No. of steps')
+lines(x=comparison_data$Date,y=comparison_data$non_imputed_data,col='purple')
+legend("topright",legend=c('Imputed_data','Non-Imputed Data'),col=c('red','purple'),lty=1,cex=0.5)
+dev.off()
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Using the weekdays function, information was extracted based on that if it is a saturday or a sunday,
+it would be a weekend otherwise it's a weekday.
+
+### Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r weekday_weekend_decision}
+knitr::opts_chunk$set(echo = TRUE)
+imputed_activity_data<-data.frame(imputed_activity_data%>%mutate(ifelse(weekdays(date)=='Saturday'|weekdays(date)=='Sunday','weekend','weekday')))
+colnames(imputed_activity_data)<-c('steps','date','interval','weekday_weekend')
+imputed_activity_data$weekday_weekend<-as.factor(imputed_activity_data$weekday_weekend)
+```
+
+### Make a panel plot containing a time series plot (type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+
+```{r interval_avg_steps_week}
+knitr::opts_chunk$set(echo = TRUE)
+interval_avg_steps_week<-data.frame(imputed_activity_data%>%select(interval,steps,weekday_weekend,date)%>%group_by(interval,weekday_weekend)%>%summarise(mean(steps,na.rm=TRUE)))
+colnames(interval_avg_steps_week)<-c('interval','weekday_weekend','mean_steps')
+```
+
+Building the plot. 
+
+**Please note**: The graph is little different from the one that I have created because I think when steps are counted they shouldn't go negative. Therefore, I created a panel plot based on the method they have mentioned in the README files.
+
+```{r plot_interval_avg_steps_week}
+knitr::opts_chunk$set(echo = TRUE)
+xyplot(mean_steps ~ interval | weekday_weekend , data=interval_avg_steps_week, pch=".",type="l", aspect=1, layout=c(1,2))
+```
+
+```{r plot_interval_avg_steps_week_save, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+png(filename="./figures/5_interval_avg_steps_week.png", width=480, height=480, units="px")
+xyplot(mean_steps ~ interval | weekday_weekend , data=interval_avg_steps_week, pch=".",type="l", aspect=1, layout=c(1,2))
+dev.off()
+```
+
+
+                  **ANALYSIS COMPLETED ! HOPE YOU ARE HAVING A GOOD DAY**
+
